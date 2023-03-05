@@ -112,19 +112,6 @@ impl Default for Vertex {
   }
 }
 
-#[cfg(test)]
-impl Vertex {
-  fn numeric(index: usize) -> Self {
-    let key = format!("node_{}", index);
-    Self {
-      id: Id::validate(key.clone()),
-      label: Some(Label(key)),
-      color: None,
-      fontcolor: None,
-    }
-  }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct NodeDefaults {
   pub color: Option<Color>,
@@ -394,10 +381,20 @@ pub trait Graphable {
 mod test {
   use super::*;
 
+  fn numeric_vertex(index: usize) -> Vertex {
+    let key = format!("node_{}", index);
+    Vertex {
+      id: Id::validate(key.clone()),
+      label: Some(Label(key)),
+      color: None,
+      fontcolor: None,
+    }
+  }
+
   #[test]
   fn render_single_vertex() {
     let mut gb = GraphBuilder::new();
-    gb.accept_entity(Entity::Vertex(Vertex::numeric(0)));
+    gb.accept_entity(Entity::Vertex(numeric_vertex(0)));
     let DotOutput(output) = gb.build(Id::validate("test_graph".to_string()));
 
     assert_eq!(
@@ -412,11 +409,11 @@ mod test {
   #[test]
   fn render_single_edge() {
     let mut gb = GraphBuilder::new();
-    gb.accept_entity(Entity::Vertex(Vertex::numeric(0)));
-    gb.accept_entity(Entity::Vertex(Vertex::numeric(1)));
+    gb.accept_entity(Entity::Vertex(numeric_vertex(0)));
+    gb.accept_entity(Entity::Vertex(numeric_vertex(1)));
     gb.accept_entity(Entity::Edge(Edge {
-      source: Vertex::numeric(0).id,
-      target: Vertex::numeric(1).id,
+      source: numeric_vertex(0).id,
+      target: numeric_vertex(1).id,
       label: Some(Label("asdf".to_string())),
       ..Default::default()
     }));
