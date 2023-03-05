@@ -1,7 +1,11 @@
 [package]
 name                    = "graphvizier"
+description             = "A dot file generator."
 version                 = "0.0.0"
 edition                 = "2021"
+license                 = "Apache-2.0"
+repository              = "https://github.com/cosmicexplorer/graphvizier"
+authors                 = ["Danny McClanahan <dmcC2@hypnicjerk.ai>"]
 
 [dependencies]
 lazy_static             = "1"
