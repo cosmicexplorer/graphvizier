@@ -26,7 +26,8 @@
  * TODO: rustfmt breaks multiline comments when used one on top of another! (each with its own
  * pair of delimiters)
  * Note: run clippy with: rustup run nightly cargo-clippy! */
-#![warn(missing_docs)]
+/* TODO: add docs! */
+/* #![warn(missing_docs)] */
 /* There should be no need to use unsafe code here! */
 #![deny(unsafe_code)]
 /* Ensure any doctest warnings fails the doctest! */
