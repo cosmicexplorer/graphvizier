@@ -26,8 +26,7 @@
  * TODO: rustfmt breaks multiline comments when used one on top of another! (each with its own
  * pair of delimiters)
  * Note: run clippy with: rustup run nightly cargo-clippy! */
-/* TODO: add docs! */
-/* #![warn(missing_docs)] */
+#![warn(missing_docs)]
 /* There should be no need to use unsafe code here! */
 #![deny(unsafe_code)]
 /* Ensure any doctest warnings fails the doctest! */
@@ -59,37 +58,66 @@
 /* Arc<Mutex> can be more clear than needing to grok Orderings. */
 #![allow(clippy::mutex_atomic)]
 
+/// [`Entity`] defines all the top-level objects we know how to represent in a
+/// `.dot` file.
 pub mod entities {
+  /// Structs used to configure the presentation of objects.
+  pub mod style {
+    /// Text to display on or next to the object.
+    #[derive(Debug, Clone)]
+    pub struct Label(pub String);
+
+    /// An [HTML color name](https://en.wikipedia.org/wiki/Web_colors#Extended_colors).
+    #[derive(Debug, Clone)]
+    pub struct Color(pub String);
+
+    /// Default values to set for styling vertices using
+    /// [`node [name0=val0]`](https://www.graphviz.org/docs/nodes/).
+    #[derive(Debug, Clone, Default)]
+    #[allow(missing_docs)]
+    pub struct NodeDefaults {
+      pub color: Option<Color>,
+      pub fontcolor: Option<Color>,
+    }
+  }
+  pub use style::*;
+
+  /// The key used to reference a vertex in a `.dot` file.
   #[derive(Debug, Hash, PartialEq, Eq, Clone)]
   pub struct Id(String);
 
   impl Id {
-    pub fn into_string(self) -> String {
-      self.0
-    }
+    /// Construct an ID from any string.
+    pub fn new<S: AsRef<str>>(s: S) -> Self { Self(s.as_ref().to_string()) }
 
-    pub fn validate(s: String) -> Self {
+    /// Add double quotes around this string if needed to form a valid ID for a
+    /// [DOT language](https://www.graphviz.org/doc/info/lang.html) document.
+    ///
+    /// [`GraphBuilder`](super::generator::GraphBuilder) uses this method to
+    /// generate more readable documents by avoiding quotations unless
+    /// necessary.
+    pub fn maybe_escaped(self) -> String {
       use lazy_static::lazy_static;
-      use regex::Regex;
+      use regex::RegexSet;
+
+      static ALPHA_ID: &str = "[a-zA-Z_\\\\200-\\\\377][a-zA-Z_\\\\200-\\\\3770-9]*";
+      static NUMERAL_ID: &str = "[-]?(.[0-9]+|[0-9]+(.[0-9]*)?)";
 
       lazy_static! {
-        static ref VALID_GRAPHVIZ_ID: Regex = Regex::new("^[a-zA-Z0-9_-]*$").unwrap();
+        static ref UNQUOTED_IDS: RegexSet = RegexSet::new(&[ALPHA_ID, NUMERAL_ID]).unwrap();
       }
 
-      if !VALID_GRAPHVIZ_ID.is_match(&s) {
-        let rx: &Regex = &VALID_GRAPHVIZ_ID;
-        panic!("invalid id '{}' provided: must match /{}/", s, rx);
+      let Self(s) = self;
+      if UNQUOTED_IDS.is_match(&s) {
+        s
+      } else {
+        /* Add double quotes around this string and escape any
+         * internal double quotes. */
+        format!("{:?}", s)
       }
-
-      Self(s)
     }
   }
 
-  #[derive(Debug, Clone)]
-  pub struct Label(pub String);
-
-  #[derive(Debug, Clone)]
-  pub struct Color(pub String);
 
   #[derive(Debug, Clone)]
   pub struct Vertex {
@@ -103,7 +131,7 @@ pub mod entities {
     fn default() -> Self {
       use uuid::Uuid;
 
-      let id = Id::validate(Uuid::new_v4().to_string());
+      let id = Id::new(Uuid::new_v4().to_string());
       Self {
         id,
         label: None,
@@ -111,12 +139,6 @@ pub mod entities {
         fontcolor: None,
       }
     }
-  }
-
-  #[derive(Debug, Clone, Default)]
-  pub struct NodeDefaults {
-    pub color: Option<Color>,
-    pub fontcolor: Option<Color>,
   }
 
   #[derive(Debug, Clone)]
@@ -141,7 +163,7 @@ pub mod entities {
       use uuid::Uuid;
 
       /* TODO: make this a utility method! */
-      let id = Id::validate(Uuid::new_v4().to_string());
+      let id = Id::new(Uuid::new_v4().to_string());
       Self {
         id,
         label: None,
@@ -165,8 +187,8 @@ pub mod entities {
   impl Default for Edge {
     fn default() -> Self {
       Self {
-        source: Id::validate("".to_string()),
-        target: Id::validate("".to_string()),
+        source: Id::new(""),
+        target: Id::new(""),
         label: None,
         color: None,
         fontcolor: None,
@@ -192,13 +214,9 @@ pub mod generator {
       }
     }
 
-    pub fn accept_entity(&mut self, e: Entity) {
-      self.entities.push(e);
-    }
+    pub fn accept_entity(&mut self, e: Entity) { self.entities.push(e); }
 
-    fn newline(output: &mut String) {
-      output.push('\n');
-    }
+    fn newline(output: &mut String) { output.push('\n'); }
 
     fn newline_indent(output: &mut String, indent: usize) {
       Self::newline(output);
@@ -207,9 +225,7 @@ pub mod generator {
       }
     }
 
-    fn bump_indent(indent: &mut usize) {
-      *indent += 2;
-    }
+    fn bump_indent(indent: &mut usize) { *indent += 2; }
 
     fn unbump_indent(indent: &mut usize) {
       assert!(*indent >= 2);
@@ -224,7 +240,7 @@ pub mod generator {
           color,
           fontcolor,
         }) => {
-          let mut output = id.into_string();
+          let mut output = id.maybe_escaped();
 
           let mut modifiers: Vec<String> = Vec::new();
           if let Some(Label(label)) = label {
@@ -258,7 +274,7 @@ pub mod generator {
           color,
           fontcolor,
         }) => {
-          let mut output = format!("{} -> {}", source.into_string(), target.into_string());
+          let mut output = format!("{} -> {}", source.maybe_escaped(), target.maybe_escaped());
 
           let mut modifiers: Vec<String> = Vec::new();
           if let Some(Label(label)) = label {
@@ -293,7 +309,7 @@ pub mod generator {
           node_defaults,
           entities,
         }) => {
-          let mut output = format!("subgraph {} {{", id.into_string());
+          let mut output = format!("subgraph {} {{", id.maybe_escaped());
           Self::bump_indent(&mut indent);
 
           Self::newline_indent(&mut output, indent);
@@ -352,7 +368,7 @@ pub mod generator {
       let mut output: String = String::new();
       let mut indent: usize = 0;
 
-      output.push_str(format!("digraph {} {{", graph_name.into_string()).as_str());
+      output.push_str(format!("digraph {} {{", graph_name.maybe_escaped()).as_str());
       Self::bump_indent(&mut indent);
 
       Self::newline_indent(&mut output, indent);
@@ -383,7 +399,7 @@ pub mod generator {
     fn numeric_vertex(index: usize) -> Vertex {
       let key = format!("node_{}", index);
       Vertex {
-        id: Id::validate(key.clone()),
+        id: Id::new(key.clone()),
         label: Some(Label(key)),
         color: None,
         fontcolor: None,
@@ -394,7 +410,7 @@ pub mod generator {
     fn render_single_vertex() {
       let mut gb = GraphBuilder::new();
       gb.accept_entity(Entity::Vertex(numeric_vertex(0)));
-      let DotOutput(output) = gb.build(Id::validate("test_graph".to_string()));
+      let DotOutput(output) = gb.build(Id::new("test_graph"));
 
       assert_eq!(
         output,
@@ -417,7 +433,7 @@ pub mod generator {
         ..Default::default()
       }));
 
-      let DotOutput(output) = gb.build(Id::validate("test_graph".to_string()));
+      let DotOutput(output) = gb.build(Id::new("test_graph"));
 
       assert_eq!(
         output,
@@ -434,6 +450,6 @@ pub mod generator {
 
 /// Implement this trait to expose a graphviz implementation of your type.
 pub trait Graphable {
-  /// This impl will be somewhat complex, and different for each type!
+  /// This impl will often be somewhat complex!
   fn build_graph(self) -> generator::GraphBuilder;
 }
