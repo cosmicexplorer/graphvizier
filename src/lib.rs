@@ -58,7 +58,7 @@
 /* Arc<Mutex> can be more clear than needing to grok Orderings. */
 #![allow(clippy::mutex_atomic)]
 
-/// [`Entity`](Entity) defines all the top-level objects we know how to represent in a
+/// [`Entity`](entities::Entity) defines all the top-level objects we know how to represent in a
 /// `.dot` file.
 pub mod entities {
   /// Structs used to configure the presentation of objects.
